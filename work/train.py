@@ -12,6 +12,9 @@ from utils import MovingAverage
 
 
 def train_epoch(loader, model, criterion, prior, optimizer, stop_prior_grad=False, freeze_model=False):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    
     criterion = criterion()
     model.train()
     total_ce = 0
@@ -27,14 +30,14 @@ def train_epoch(loader, model, criterion, prior, optimizer, stop_prior_grad=Fals
         if len(d) == 2:
             inputs, targets = d
             pretrained_feats = None
-            inputs, targets = inputs.cuda(), targets.cuda()
+            inputs, targets = inputs.to(device), targets.to(device)
         else:
             inputs, pretrained_feats, targets = d
             if hasattr(inputs, 'items'):
-                inputs = {k: v.cuda() for k, v in inputs.items()}
+                inputs = {k: v.to(device) for k, v in inputs.items()}
             else:
-                inputs = inputs.cuda()
-            pretrained_feats, targets = pretrained_feats.cuda(), targets.cuda()
+                inputs = inputs.to(device)
+            pretrained_feats, targets = pretrained_feats.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs, feats = model(inputs, return_feat=True)
         if freeze_model:
@@ -71,6 +74,8 @@ def train_epoch(loader, model, criterion, prior, optimizer, stop_prior_grad=Fals
 
 def evaluate_model(loader, model, criterion=nn.CrossEntropyLoss, max_test_points=None):
     criterion = criterion(reduction='none')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
     model.eval()  # Set the model to evaluation mode
     total_loss = 0
     total_ent = 0
@@ -82,14 +87,14 @@ def evaluate_model(loader, model, criterion=nn.CrossEntropyLoss, max_test_points
             if len(d) == 2:
                 inputs, targets = d
                 pretrained_feats = None
-                inputs, targets = inputs.cuda(), targets.cuda()
+                inputs, targets = inputs.to(device), targets.to(device)
             else:
                 inputs, pretrained_feats, targets = d
                 if hasattr(inputs, 'items'):
-                    inputs = {k: v.cuda() for k, v in inputs.items()}
+                    inputs = {k: v.to(device) for k, v in inputs.items()}
                 else:
-                    inputs = inputs.cuda()
-                pretrained_feats, targets = pretrained_feats.cuda(), targets.cuda()
+                    inputs = inputs.to(device)
+                pretrained_feats, targets = pretrained_feats.to(device), targets.to(device)
             outputs = model(inputs)
             p = nn.functional.softmax(outputs, dim=1)
             total_ent += -torch.sum(p * torch.log(p + 1e-8)).item()
@@ -108,6 +113,7 @@ def evaluate_model(loader, model, criterion=nn.CrossEntropyLoss, max_test_points
 
 
 def train_model(model, loaders, optimizer='sgd', steps=1000, eval_steps=500, lr=1e-3, prior_lr=1e-2, pretrained_init=None, prior=UniformPrior(), prior_pretrain_steps=0, prior_freq=1, freeze_init=False, stop_prior_grad=False, wandb_run=None, wd=0, **kwargs):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if optimizer == 'sgd':
         optim_class = partial(optim.SGD, momentum=0.9)
     elif optimizer == 'adam':
@@ -118,7 +124,7 @@ def train_model(model, loaders, optimizer='sgd', steps=1000, eval_steps=500, lr=
     
     n_epochs = steps / len(loaders[0])
     n_epochs = int(n_epochs + 0.5)
-    model = model.cuda()
+    model = model.to(device)
     
     if pretrained_init is not None:
         init_from_pretrained(model, pretrained_init, freeze_init)
@@ -128,7 +134,7 @@ def train_model(model, loaders, optimizer='sgd', steps=1000, eval_steps=500, lr=
     model_params = [p for p in model.parameters()]
     prior_params = []
     if isinstance(prior, nn.Module):
-        prior.cuda()
+        prior.to(device)
         prior_params = [p for p in prior.parameters()]
 
     param_groups = [{'params': model_params, 'lr': lr, 'weight_decay': wd}]
@@ -179,5 +185,6 @@ def train_model(model, loaders, optimizer='sgd', steps=1000, eval_steps=500, lr=
 
 def train(loaders, model, init_model, prior, wandb_run, hypers):
     print(f'Trainable parameters: {sum([p.numel() for p in model.parameters()])/1e6:.2g}M')
-    model.cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
     train_model(model, loaders, prior=prior, pretrained_init=init_model, wandb_run=wandb_run, **hypers)

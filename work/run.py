@@ -12,7 +12,7 @@ from prior import UniformPrior, get_prior, get_btune_prior
 import utils as u
 from data import FeatureDataset
 
-def main(model_class, dataset, train_frac, use_val, method, steps, eval_steps=1000, prec=0, pretrained_models=None, init_model=None, batch_size=128, optimizer='sgd', lr=1e-3, wd=0, learn_scales=False, prior_lr=1e-2, prior_freq=1, prior_pretrain_steps=0, ckpt_dir=None, seed=0, use_wandb=False, run_name=None, no_augment=True, cache=False, **kwargs):
+def main(model_class, dataset, train_frac, use_val, method, steps, eval_steps=1000, prec=0, pretrained_models=None, init_model=None, batch_size=128, subset_size=None, optimizer='sgd', lr=1e-3, wd=0, learn_scales=False, prior_lr=1e-2, prior_freq=1, prior_pretrain_steps=0, ckpt_dir=None, seed=0, use_wandb=False, run_name=None, no_augment=True, cache=False, **kwargs):
     assert no_augment or method == 'init', 'Must not use augmentation unless method == init'
     u.set_seed(seed)
     if dataset in ['mnli', 'qqp', 'qnli']:
@@ -25,6 +25,12 @@ def main(model_class, dataset, train_frac, use_val, method, steps, eval_steps=10
     model, get_transform, tokenizer, input_collate_fn = models.create_model(model_class, out_dim=out_dim, pretrained=False, **kwargs) # call get_transform with train=True/False to get train/test transforms
     # train val test split
     train_ds, test_ds = get_dataset(dataset, get_transform, tokenizer, no_augment, cache)
+
+    if subset_size is not None:
+        train_ds = torch.utils.data.Subset(train_ds, range(min(subset_size, len(train_ds))))
+        test_ds = torch.utils.data.Subset(test_ds, range(min(subset_size, len(test_ds))))
+        print(f"Lowering dataset size: train={len(train_ds)} -> {subset_size}, test={len(test_ds)} -> {subset_size}")
+
     val_frac = 0.1 if use_val else 0
     train_ds, val_ds = split_train(train_ds, train_frac, val_frac)
     train_indices = train_ds.indices
@@ -32,6 +38,12 @@ def main(model_class, dataset, train_frac, use_val, method, steps, eval_steps=10
     print(f'Training set size: {len(train_ds)}')
     print(f'Validation set size: {len(val_ds)}')
     raw_train_ds, raw_test_ds = get_dataset(dataset, get_transform, tokenizer, no_augment=no_augment, cache=cache)
+    
+    if subset_size is not None:
+        raw_train_ds = torch.utils.data.Subset(raw_train_ds, range(min(subset_size, len(raw_train_ds))))
+        raw_test_ds = torch.utils.data.Subset(raw_test_ds, range(min(subset_size, len(raw_test_ds))))
+        print(f"Lowering dataset size: train={len(raw_train_ds)} -> {subset_size}, test={len(raw_test_ds)} -> {subset_size}")
+
     # pretrained models
     if pretrained_models not in [None, 'none']:
         pretrained_models = pretrained_models.split(',')
