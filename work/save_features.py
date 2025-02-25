@@ -77,13 +77,9 @@ def main(model_class, dataset, batch_size=128, num_workers=0, save_path=None, su
         train_ratio = len(train_dataset) / total_size
         test_ratio = len(test_dataset) / total_size
 
-        print(train_ratio)
-        print(test_ratio)
-
         # New size
         train_subset_size = int(subset_size * train_ratio)
         test_subset_size = int(subset_size * test_ratio)
-
 
         train_dataset = torch.utils.data.Subset(train_dataset, range(min(train_subset_size, len(train_dataset))))
         test_dataset = torch.utils.data.Subset(test_dataset, range(min(test_subset_size, len(test_dataset))))
