@@ -27,9 +27,18 @@ def main(model_class, dataset, train_frac, use_val, method, steps, eval_steps=10
     train_ds, test_ds = get_dataset(dataset, get_transform, tokenizer, no_augment, cache)
 
     if subset_size is not None:
-        train_ds = torch.utils.data.Subset(train_ds, range(min(subset_size, len(train_ds))))
-        test_ds = torch.utils.data.Subset(test_ds, range(min(subset_size, len(test_ds))))
-        print(f"Lowering dataset size: train={len(train_ds)} -> {subset_size}, test={len(test_ds)} -> {subset_size}")
+        total_size = len(train_ds) + len(test_ds) # ratio size in the original dataset
+        train_ratio = len(train_ds) / total_size
+        test_ratio = len(test_ds) / total_size
+
+        # New size
+        train_subset_size = int(subset_size * train_ratio)
+        test_subset_size = int(subset_size * test_ratio)
+
+
+        train_ds = torch.utils.data.Subset(train_ds, range(min(train_subset_size, len(train_ds))))
+        test_ds = torch.utils.data.Subset(test_ds, range(min(test_subset_size, len(test_ds))))
+        print(f"Lowering dataset size: train={len(train_ds)} -> {train_subset_size}, test={len(test_ds)} -> {test_subset_size}")
 
     val_frac = 0.1 if use_val else 0
     train_ds, val_ds = split_train(train_ds, train_frac, val_frac)
@@ -39,10 +48,10 @@ def main(model_class, dataset, train_frac, use_val, method, steps, eval_steps=10
     print(f'Validation set size: {len(val_ds)}')
     raw_train_ds, raw_test_ds = get_dataset(dataset, get_transform, tokenizer, no_augment=no_augment, cache=cache)
     
-    if subset_size is not None:
-        raw_train_ds = torch.utils.data.Subset(raw_train_ds, range(min(subset_size, len(raw_train_ds))))
-        raw_test_ds = torch.utils.data.Subset(raw_test_ds, range(min(subset_size, len(raw_test_ds))))
-        print(f"Lowering dataset size: train={len(raw_train_ds)} -> {subset_size}, test={len(raw_test_ds)} -> {subset_size}")
+    if subset_size is not None:        
+        raw_train_ds = torch.utils.data.Subset(raw_train_ds, range(min(train_subset_size, len(raw_train_ds))))
+        raw_test_ds = torch.utils.data.Subset(raw_test_ds, range(min(test_subset_size, len(raw_test_ds))))
+        print(f"Lowering dataset size: train={len(raw_train_ds)} -> {train_subset_size}, test={len(raw_test_ds)} -> {test_subset_size}")
 
     # pretrained models
     if pretrained_models not in [None, 'none']:
