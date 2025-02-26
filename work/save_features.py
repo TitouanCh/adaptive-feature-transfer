@@ -73,9 +73,17 @@ def main(model_class, dataset, batch_size=128, num_workers=0, save_path=None, su
     train_dataset, test_dataset = get_dataset(dataset, get_transform, tokenizer, no_augment=True) # (train, test)
     
     if subset_size is not None:
-        train_dataset = torch.utils.data.Subset(train_dataset, range(min(subset_size, len(train_dataset))))
-        test_dataset = torch.utils.data.Subset(test_dataset, range(min(subset_size, len(test_dataset))))
-        print(f"Lowering dataset size: train={len(train_dataset)} -> {subset_size}, test={len(test_dataset)} -> {subset_size}")
+        total_size = len(train_dataset) + len(test_dataset) # ratio size in the original dataset
+        train_ratio = len(train_dataset) / total_size
+        test_ratio = len(test_dataset) / total_size
+
+        # New size
+        train_subset_size = int(subset_size * train_ratio)
+        test_subset_size = int(subset_size * test_ratio)
+
+        train_dataset = torch.utils.data.Subset(train_dataset, range(min(train_subset_size, len(train_dataset))))
+        test_dataset = torch.utils.data.Subset(test_dataset, range(min(test_subset_size, len(test_dataset))))
+        print(f"Lowering dataset size: train={len(train_dataset)} -> {train_subset_size}, test={len(test_dataset)} -> {test_subset_size}")
 
     train_loader = get_loader(train_dataset, batch_size, num_workers=num_workers, shuffle=False, input_collate_fn=input_collate_fn)
     test_loader = get_loader(test_dataset, batch_size, num_workers=num_workers, shuffle=False, input_collate_fn=input_collate_fn)
